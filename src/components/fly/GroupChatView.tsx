@@ -1,7 +1,7 @@
 import { swipeReplyHandlers } from "./swipeReply";
 import { PREMIUM_REACTIONS, isPremium } from "./premium";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { getMicStream, withRetry } from "../../lib/mic";
+import { getMicStream, pickNativeAudio, withRetry } from "../../lib/mic";
 import {
   ArrowLeft,
   Check,
@@ -292,6 +292,12 @@ export function GroupChatView({
       recorder.start(100);
       setRecording(true);
     } catch (err) {
+      // Some app wrappers block the in-page mic; fall back to the phone's recorder.
+      const file = await pickNativeAudio().catch(() => null);
+      if (file) {
+        void sendVoice(file);
+        return;
+      }
       setError(err instanceof Error ? err.message : "Microphone permission is needed to record voice");
     }
   };
