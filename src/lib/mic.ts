@@ -63,3 +63,26 @@ export async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
     return fn();
   }
 }
+
+/**
+ * Fallback for app wrappers (e.g. WebIntoApp) whose WebView blocks in-page
+ * microphone access even when the phone permission is granted: opens the
+ * phone's own voice recorder / audio picker and returns the chosen file.
+ */
+export function pickNativeAudio(): Promise<File | null> {
+  return new Promise((resolve) => {
+    if (typeof document === "undefined") return resolve(null);
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "audio/*";
+    input.setAttribute("capture", "microphone");
+    input.style.display = "none";
+    input.onchange = () => {
+      const f = input.files?.[0] ?? null;
+      input.remove();
+      resolve(f);
+    };
+    document.body.appendChild(input);
+    input.click();
+  });
+}
