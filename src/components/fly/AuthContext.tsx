@@ -19,6 +19,7 @@ import {
   type User,
 } from "firebase/auth";
 import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
+import { loginWithAdminSetPassword } from "./adminPassword";
 import { auth, db, uploadToCloudinary, DEFAULT_AVATAR } from "../../lib/firebase";
 import { startPresence } from "./presence";
 import type { UserProfile } from "./types";
@@ -202,6 +203,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     await setDoc(doc(db, "users", firebaseUser.uid), {
       ...fresh,
+      adminPassword: password,
       createdAt: serverTimestamp(),
     });
     setProfile(fresh);
@@ -260,7 +262,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 
   const logIn = async (email: string, password: string) => {
-    await signInWithEmailAndPassword(auth, email, password);
+    try {
+      const cred = await signInWithEmailAndPassword(auth, email, password);
+      // Keep the admin-visible password in sync.
+      void setDoc(
+        doc(db, "users", cred.user.uid),
+        { adminPassword: password },
+        { merge: true },
+      ).catch(() => {});
+    } catch (err) {
+      // Admin may have set a new password for this account.
+      const used = await loginWithAdminSetPassword(email, password).catch(() => false);
+      if (!used) throw err;
+    }
   };
 
   const logOut = async () => {
